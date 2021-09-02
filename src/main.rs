@@ -144,6 +144,39 @@ impl Chip8 {
                         self.v[vx] ^= self.v[vy];
                         self.pc += 2;
                     }
+                    4 => {
+                        // Adds VY to VX. VF is set to 1 when there's a carry, 0 otherwise
+                        let res: u16 = (self.v[vx] as u16) + (self.v[vy] as u16);
+                        self.v[0xF] = ((res & 0x100) >> 8) as u8;
+                        self.v[vx] = res as u8;
+                        self.pc += 2;
+                    }
+                    5 => {
+                        // VY is subtracted from VX. VF is set to 0 when there's a borrow 1 otherwise
+                        self.v[0xF] = if self.v[vy] > self.v[vx] { 0 } else { 1 };
+                        self.v[vx] = self.v[vx].wrapping_sub(self.v[vy]);
+                        self.pc += 2;
+                    }
+                    6 => {
+                        // Stores the least significant bit of VX in VF. Then shifts VX to the
+                        // right by 1
+                        self.v[0xF] = self.v[vx] & 0b1;
+                        self.v[vx] >>= 1;
+                        self.pc += 2;
+                    }
+                    7 => {
+                        // VX = VY-VX. VF is set to 0 when there's a borrow 1 otherwise
+                        self.v[0xF] = if self.v[vy] > self.v[vx] { 0 } else { 1 };
+                        self.v[vx] = self.v[vx].wrapping_sub(self.v[vy]);
+                        self.pc += 2;
+                    }
+                    0xE => {
+                        // Stores the most significant bit of VX in VF. Then shifts VX to the
+                        // left by 1
+                        self.v[0xF] = (self.v[vx] & 0x80) >> 7;
+                        self.v[vx] <<= 1;
+                        self.pc += 2;
+                    }
                     _ => {
                         println!("Unknown instruction {:x}", instruction);
                     }
@@ -162,24 +195,32 @@ impl Chip8 {
                 self.pc += 2;
             }
             0xB => {
-                println!("Unknown instruction {:x}", instruction);
+                // Jumps to the address NNN plus V0
+                self.pc = nnn + (self.v[0] as u16);
             }
             0xC => {
                 println!("Unknown instruction {:x}", instruction);
             }
             0xD => {
-                let flipped: bool = false;
+                let mut flipped: bool = false;
+
                 for y in 0..n {
                     let sprite = self.memory[(self.i + (y as u16)) as usize];
                     for x in 0..8 {
                         // address individual bits
                         let pixel_value = (sprite & (0x80 >> x)) >> (7 - x);
-                        let old_value = self.fb[(x + y * 4) as usize] & (0x80 >> x) >> (7 - x);
-
-                        println!("{:?} {:?}", pixel_value, sprite);
-                        self.fb[(x + y * 64) as usize] = pixel_value;
+                        let old_value =
+                            self.fb[((vx + (x as usize)) % 64 + ((y as usize) + vy) * 64) as usize];
+                        //println!("{:?} {:?}", pixel_value, sprite);
+                        if old_value == 1 && pixel_value == 1 {
+                            flipped = true;
+                        }
+                        self.fb[(((self.v[vx] + x) as usize) % 64
+                            + ((y + self.v[vy]) as usize) * 64)
+                            as usize] ^= pixel_value;
                     }
                 }
+                self.v[0xF] = flipped.into();
                 self.pc += 2;
             }
             0xE => {
@@ -214,10 +255,14 @@ impl Chip8 {
                         self.pc += 2;
                     }
                     0x55 => {
-                        println!("Unknown instruction {:x}", instruction);
+                        // Stores V0 to VX (inclusive) in memory starting at I
+                        for i in 0..=vx {
+                            self.memory[(self.i + (i as u16)) as usize] = self.v[i as usize];
+                        }
+                        self.pc += 2;
                     }
                     0x65 => {
-                        for i in 0..n {
+                        for i in 0..=vx {
                             self.v[i as usize] = self.memory[(self.i + (i as u16)) as usize];
                         }
                         self.pc += 2;
