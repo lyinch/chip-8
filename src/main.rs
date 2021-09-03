@@ -9,6 +9,25 @@ use std::fs;
 #[cfg(test)]
 mod tests;
 
+const SPRITE_DATA: [[u8; 5]; 16] = [
+    [0xF0, 0x90, 0x90, 0x90, 0xF0],
+    [0x20, 0x60, 0x20, 0x20, 0x70],
+    [0xF0, 0x10, 0xF0, 0x80, 0xF0],
+    [0xF0, 0x10, 0xF0, 0x10, 0xF0],
+    [0x90, 0x90, 0xF0, 0x10, 0x10],
+    [0xF0, 0x80, 0xF0, 0x10, 0xF0],
+    [0xF0, 0x80, 0xF0, 0x90, 0xF0],
+    [0xF0, 0x10, 0x20, 0x40, 0x40],
+    [0xF0, 0x90, 0xF0, 0x90, 0xF0],
+    [0xF0, 0x90, 0xF0, 0x10, 0xF0],
+    [0xF0, 0x90, 0xF0, 0x90, 0x90],
+    [0xE0, 0x90, 0xE0, 0x90, 0xE0],
+    [0xF0, 0x80, 0x80, 0x80, 0xF0],
+    [0xE0, 0x90, 0x90, 0x90, 0xE0],
+    [0xF0, 0x80, 0xF0, 0x80, 0xF0],
+    [0xF0, 0x80, 0xF0, 0x80, 0x80],
+];
+
 pub struct Chip8 {
     memory: [u8; 4096], // 4096 bytes of 8-bit. First 512 addresses are reserved
     stack: [u16; 16],   // 16 16-bit entries
@@ -23,8 +42,12 @@ pub struct Chip8 {
 impl Chip8 {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
+        let mut memory = [0; 4096];
+        for (i, sprite) in SPRITE_DATA.iter().enumerate() {
+            memory[i * 5..i * 5 + 5].copy_from_slice(sprite);
+        }
         Self {
-            memory: [0; 4096],
+            memory,
             stack: [0; 16],
             v: [0; 16],
             pc: 0x200, // first 512 addresses are reserved
@@ -36,7 +59,7 @@ impl Chip8 {
     }
 
     pub fn load_rom(&mut self) {
-        let data: Vec<u8> = fs::read("ufo.ch8").unwrap();
+        let data: Vec<u8> = fs::read("test_opcode.ch8").unwrap();
         for (index, byte) in data.into_iter().enumerate() {
             self.memory[index + 0x200] = byte;
         }
@@ -213,7 +236,6 @@ impl Chip8 {
                         let pixel_value = (sprite & (0x80 >> x)) >> (7 - x);
                         let old_value =
                             self.fb[((vx + (x as usize)) % 64 + ((y as usize) + vy) * 64) as usize];
-                        //println!("{:?} {:?}", pixel_value, sprite);
                         if old_value == 1 && pixel_value == 1 {
                             flipped = true;
                         }
@@ -233,6 +255,13 @@ impl Chip8 {
                     }
                     self.pc += 2;
                 }
+                0xA1 => {
+                    // Skips the next instruction if the key stored in VX is not pressed
+                    if !self.key_pressed[self.v[vx] as usize] {
+                        self.pc += 2;
+                    }
+                    self.pc += 2;
+                }
                 _ => {
                     println!("Unknown instruction {:x}", instruction);
                 }
@@ -243,7 +272,13 @@ impl Chip8 {
                         println!("Unknown instruction {:x}", instruction);
                     }
                     0x0A => {
-                        println!("Unknown instruction {:x}", instruction);
+                        // Blocks until a key is pressed. Stores the key in VX
+                        for k in 0..0xF {
+                            if self.key_pressed[k] {
+                                self.v[vx] = k as u8;
+                                self.pc += 2;
+                            }
+                        }
                     }
                     0x15 => {
                         println!("Unknown instruction {:x}", instruction);
@@ -257,12 +292,13 @@ impl Chip8 {
                         self.pc += 2;
                     }
                     0x29 => {
-                        println!("Unknown instruction {:x}", instruction);
+                        self.i = (self.v[vx] as u16) * 5;
+                        self.pc += 2;
                     }
                     0x33 => {
-                        self.memory[self.i as usize] = ((vx / 100) >> 2) as u8;
-                        self.memory[self.i as usize] = (((vx / 10) & 2) >> 1) as u8;
-                        self.memory[self.i as usize] = (vx & 1) as u8;
+                        self.memory[self.i as usize] = (self.v[vx] / 100) as u8;
+                        self.memory[self.i as usize + 1] = ((self.v[vx] / 10) % 10) as u8;
+                        self.memory[self.i as usize + 2] = (self.v[vx] % 10) as u8;
                         self.pc += 2;
                     }
                     0x55 => {
