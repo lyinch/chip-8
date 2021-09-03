@@ -59,7 +59,8 @@ impl Chip8 {
     }
 
     pub fn load_rom(&mut self) {
-        let data: Vec<u8> = fs::read("test_opcode.ch8").unwrap();
+        //let data: Vec<u8> = fs::read("test_opcode.ch8").unwrap();
+        let data: Vec<u8> = fs::read("ufo.ch8").unwrap();
         for (index, byte) in data.into_iter().enumerate() {
             self.memory[index + 0x200] = byte;
         }
@@ -112,7 +113,7 @@ impl Chip8 {
             }
             2 => {
                 // Calls subroutine at nnn
-                self.stack[self.sp as usize] = self.pc;
+                self.stack[self.sp as usize] = self.pc + 2;
                 self.sp += 1;
                 self.pc = nnn;
             }
@@ -144,13 +145,13 @@ impl Chip8 {
             }
             7 => {
                 // 7XNN: Add NN to VX without changing carry flag
-                self.v[vx] += nn;
+                self.v[vx] = self.v[vx].wrapping_add(nn);
                 self.pc += 2;
             }
             8 => {
                 match instruction & 0xF {
                     0 => {
-                        //8XY0: Assign VX to VY
+                        //8XY0: VX = VY
                         self.v[vx] = self.v[vy];
                         self.pc += 2;
                     }

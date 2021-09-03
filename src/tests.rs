@@ -49,7 +49,7 @@ fn test_2nnn() {
 
     assert!(ch8.pc == 0xF0B);
     assert!(ch8.sp == 1);
-    assert!(ch8.stack[0] == 0x200);
+    assert!(ch8.stack[0] == 0x202);
 }
 
 #[test]
@@ -121,6 +121,18 @@ fn test_7xnn() {
 
     assert!(ch8.pc == 0x202);
     assert!(ch8.v[0] == 0x5F);
+}
+
+#[test]
+fn test_7xnn_regression() {
+    let mut ch8 = Chip8::new();
+    ch8.memory[0x200] = 0x70;
+    ch8.memory[0x201] = 0xFF;
+    ch8.v[0] = 0x1;
+    ch8.step();
+
+    assert!(ch8.pc == 0x202);
+    assert!(ch8.v[0] == 0x00);
 }
 
 #[test]
