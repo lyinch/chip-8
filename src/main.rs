@@ -17,6 +17,7 @@ pub struct Chip8 {
     i: u16,             // index register
     sp: u8,             // stack pointer
     fb: [u8; 64 * 32],  // frame buffer. Use one byte per pixel to make life easier
+    key_pressed: [bool; 16],
 }
 
 impl Chip8 {
@@ -30,6 +31,7 @@ impl Chip8 {
             i: 0,
             sp: 0,
             fb: [0; 64 * 32],
+            key_pressed: [false; 16],
         }
     }
 
@@ -166,8 +168,8 @@ impl Chip8 {
                     }
                     7 => {
                         // VX = VY-VX. VF is set to 0 when there's a borrow 1 otherwise
-                        self.v[0xF] = if self.v[vy] > self.v[vx] { 0 } else { 1 };
-                        self.v[vx] = self.v[vx].wrapping_sub(self.v[vy]);
+                        self.v[0xF] = if self.v[vx] > self.v[vy] { 0 } else { 1 };
+                        self.v[vx] = self.v[vy].wrapping_sub(self.v[vx]);
                         self.pc += 2;
                     }
                     0xE => {
@@ -223,9 +225,18 @@ impl Chip8 {
                 self.v[0xF] = flipped.into();
                 self.pc += 2;
             }
-            0xE => {
-                println!("Unknown instruction {:x}", instruction);
-            }
+            0xE => match instruction & 0xFF {
+                0x9E => {
+                    // Skips the next instruction if the key stored in VX is pressed
+                    if self.key_pressed[self.v[vx] as usize] {
+                        self.pc += 2;
+                    }
+                    self.pc += 2;
+                }
+                _ => {
+                    println!("Unknown instruction {:x}", instruction);
+                }
+            },
             0xF => {
                 match instruction & 0xFF {
                     0x7 => {
@@ -297,6 +308,40 @@ fn main() {
     ch8.load_rom();
     'l: loop {
         for event in event_pump.poll_iter() {
+            macro_rules! register_key{(
+                $(
+                    ($a:pat, $b:expr)
+                    ),* $(,)?)
+                => {
+                    match event {
+                        $(
+                        Event::KeyDown { keycode: Some($a), .. } => { ch8.key_pressed[$b] = true; },
+                        Event::KeyUp   { keycode: Some($a), .. } => { ch8.key_pressed[$b] = false; },
+                        )*
+                        _ => {}
+                    }
+                }
+            }
+
+            register_key![
+                (Keycode::Num0, 0),
+                (Keycode::Num1, 1),
+                (Keycode::Num2, 2),
+                (Keycode::Num3, 3),
+                (Keycode::Num4, 4),
+                (Keycode::Num5, 5),
+                (Keycode::Num6, 6),
+                (Keycode::Num7, 7),
+                (Keycode::Num8, 8),
+                (Keycode::Num9, 9),
+                (Keycode::A, 10),
+                (Keycode::B, 11),
+                (Keycode::C, 12),
+                (Keycode::D, 13),
+                (Keycode::E, 14),
+                (Keycode::F, 15),
+            ];
+
             match event {
                 Event::Quit { .. } => {
                     break 'l;
@@ -307,6 +352,7 @@ fn main() {
                 } => {
                     break 'l;
                 }
+                //register_key![(Keycode::B,2)];
                 Event::KeyDown {
                     keycode: Some(Keycode::N),
                     ..

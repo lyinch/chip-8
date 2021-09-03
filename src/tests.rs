@@ -370,7 +370,19 @@ fn test_dxyn() {
 
 #[test]
 fn test_ex9e() {
-    assert!(false);
+    let mut ch8 = Chip8::new();
+    ch8.memory[0x200] = 0xe0;
+    ch8.memory[0x201] = 0x9e;
+    ch8.v[0] = 0x2;
+    ch8.step();
+
+    assert!(ch8.pc == 0x202);
+
+    ch8.pc = 0x200;
+    ch8.key_pressed[2] = true;
+
+    ch8.step();
+    assert!(ch8.pc == 0x204);
 }
 
 #[test]
