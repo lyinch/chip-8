@@ -4,7 +4,10 @@ use sdl2::rect::Point;
 
 use sdl2::keyboard::Keycode;
 
+use rand::prelude::*;
 use std::fs;
+
+use std::{thread, time};
 
 #[cfg(test)]
 mod tests;
@@ -225,7 +228,8 @@ impl Chip8 {
                 self.pc = nnn + (self.v[0] as u16);
             }
             0xC => {
-                println!("Unknown instruction {:x}", instruction);
+                self.v[vx] = nn | rand::thread_rng().gen_range(0..=255);
+                self.pc += 2;
             }
             0xD => {
                 let mut flipped: bool = false;
@@ -240,7 +244,7 @@ impl Chip8 {
                         if old_value == 1 && pixel_value == 1 {
                             flipped = true;
                         }
-                        self.fb[(((self.v[vx] + x) as usize) % 64
+                        self.fb[(((self.v[vx] as usize) + x) % 64
                             + ((y + self.v[vy]) as usize) * 64)
                             as usize] ^= pixel_value;
                     }
@@ -411,5 +415,20 @@ fn main() {
                 _ => {}
             }
         }
+        ch8.step();
+
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
+        canvas.clear();
+        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        for (index, pixel) in ch8.fb.iter().enumerate() {
+            let x = (index % 64) as i32;
+            let y = (index / 64) as i32;
+            if *pixel == 1 {
+                canvas.draw_point(Point::new(x, y)).unwrap();
+            }
+        }
+        canvas.present();
+
+        thread::sleep(time::Duration::from_millis(20));
     }
 }
