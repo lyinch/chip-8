@@ -103,8 +103,8 @@ impl Chip8 {
 
                 0x0ee => {
                     // Returns from a subroutine
-                    self.pc = self.stack[(self.sp - 1) as usize];
                     self.sp -= 1;
+                    self.pc = self.stack[(self.sp) as usize];
                 }
                 _ => {
                     println!("Unknown instruction {:x}", instruction);
@@ -228,7 +228,9 @@ impl Chip8 {
                 self.pc = nnn + (self.v[0] as u16);
             }
             0xC => {
-                self.v[vx] = nn | rand::thread_rng().gen_range(0..=255);
+                // Sets VX to the result of a bitwise operation on a random number (0 to 255) and
+                // NN
+                self.v[vx] = nn & rand::thread_rng().gen_range(0..=255);
                 self.pc += 2;
             }
             0xD => {
@@ -241,7 +243,7 @@ impl Chip8 {
                         let pixel_value = (sprite & (0x80 >> x)) >> (7 - x);
                         let old_value =
                             self.fb[((vx + (x as usize)) % 64 + ((y as usize) + vy) * 64) as usize];
-                        if old_value == 1 && pixel_value == 1 {
+                        if (old_value == 1) && (pixel_value == 1) {
                             flipped = true;
                         }
                         self.fb[(((self.v[vx] as usize) + x) % 64
@@ -274,6 +276,7 @@ impl Chip8 {
             0xF => {
                 match instruction & 0xFF {
                     0x7 => {
+                        // Sets the delay timer to VX
                         println!("Unknown instruction {:x}", instruction);
                     }
                     0x0A => {
@@ -290,6 +293,7 @@ impl Chip8 {
                     }
                     0x18 => {
                         println!("Unknown instruction {:x}", instruction);
+                        self.pc += 2;
                     }
                     0x1E => {
                         // Adds VX to I
@@ -297,6 +301,7 @@ impl Chip8 {
                         self.pc += 2;
                     }
                     0x29 => {
+                        // Sets I to the locatoin of the sprite for the character in VX
                         self.i = (self.v[vx] as u16) * 5;
                         self.pc += 2;
                     }
@@ -314,6 +319,7 @@ impl Chip8 {
                         self.pc += 2;
                     }
                     0x65 => {
+                        // Fills V0 to VX with values from memory starting at address I
                         for i in 0..=vx {
                             self.v[i as usize] = self.memory[(self.i + (i as u16)) as usize];
                         }
